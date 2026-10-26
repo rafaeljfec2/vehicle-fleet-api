@@ -122,6 +122,14 @@ describe('Usages HTTP', () => {
     });
     expect(dateOnly.status).toBe(422);
 
+    const impossibleDay = await request(app).post('/usages').send({
+      automobileId: ids.automobileId,
+      driverId: ids.driverId,
+      startDate: '2026-02-30T10:00:00.000Z',
+      reason: 'Impossible day',
+    });
+    expect(impossibleDay.status).toBe(422);
+
     const started = await request(app).post('/usages').send({
       automobileId: ids.automobileId,
       driverId: ids.driverId,
