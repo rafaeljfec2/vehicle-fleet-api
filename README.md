@@ -40,7 +40,9 @@ npm start
 
 ## How to test
 
-Automated suite (does **not** need the server running — Vitest boots the app in-process):
+### Automated tests
+
+Does **not** need the server running — Vitest boots the app in-process:
 
 ```bash
 npm test
@@ -54,10 +56,93 @@ npm run typecheck
 npm run build
 ```
 
-Manual exploration with the server up (`npm run dev`):
+### Manual walkthrough — business rules (recommended)
 
-1. Open Swagger UI at `/docs` and use **Try it out**, or
-2. Use the `curl` examples below (create automobile → create driver → start usage → finish usage).
+Business rules under test:
+
+1. An automobile can be used by only one driver at a time.
+2. A driver who is already using an automobile cannot use another one at the same time.
+
+**Prerequisites:** in one terminal run `npm run dev`. Keep it open to see business logs (`usage.started`, `usage.rejected.automobile_in_use`, etc.) on stderr. In a second terminal, run the steps below from the project root.
+
+```bash
+BASE=http://localhost:3000
+
+# 1) Seed two automobiles and two drivers
+AUTO1=$(curl -s -X POST "$BASE/automobiles" \
+  -H 'Content-Type: application/json' \
+  -d '{"plate":"AAA1A11","color":"Silver","brand":"Toyota"}' \
+  | node -pe 'JSON.parse(fs.readFileSync(0,"utf8")).id')
+
+AUTO2=$(curl -s -X POST "$BASE/automobiles" \
+  -H 'Content-Type: application/json' \
+  -d '{"plate":"BBB2B22","color":"Black","brand":"Honda"}' \
+  | node -pe 'JSON.parse(fs.readFileSync(0,"utf8")).id')
+
+DRV1=$(curl -s -X POST "$BASE/drivers" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Ana Silva"}' \
+  | node -pe 'JSON.parse(fs.readFileSync(0,"utf8")).id')
+
+DRV2=$(curl -s -X POST "$BASE/drivers" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Bruno Costa"}' \
+  | node -pe 'JSON.parse(fs.readFileSync(0,"utf8")).id')
+
+echo "AUTO1=$AUTO1"
+echo "AUTO2=$AUTO2"
+echo "DRV1=$DRV1"
+echo "DRV2=$DRV2"
+
+# 2) Start a valid usage (AUTO1 + DRV1) — expect HTTP 201 and endDate null
+USAGE=$(curl -s -w '\n%{http_code}' -X POST "$BASE/usages" \
+  -H 'Content-Type: application/json' \
+  -d "{\"automobileId\":\"$AUTO1\",\"driverId\":\"$DRV1\",\"startDate\":\"2026-10-26T14:00:00.000Z\",\"reason\":\"Client visit\"}")
+echo "$USAGE"
+USAGE_ID=$(printf '%s' "$USAGE" | sed '$d' | node -pe 'JSON.parse(fs.readFileSync(0,"utf8")).id')
+
+# 3) Same automobile, different driver — expect 409 AUTOMOBILE_IN_USE
+curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/usages" \
+  -H 'Content-Type: application/json' \
+  -d "{\"automobileId\":\"$AUTO1\",\"driverId\":\"$DRV2\",\"startDate\":\"2026-10-26T15:00:00.000Z\",\"reason\":\"Should fail: auto busy\"}"
+
+# 4) Same driver, different automobile — expect 409 DRIVER_IN_USE
+curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/usages" \
+  -H 'Content-Type: application/json' \
+  -d "{\"automobileId\":\"$AUTO2\",\"driverId\":\"$DRV1\",\"startDate\":\"2026-10-26T15:00:00.000Z\",\"reason\":\"Should fail: driver busy\"}"
+
+# 5) Finish the active usage — expect 200 and endDate set
+curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/usages/$USAGE_ID/finish" \
+  -H 'Content-Type: application/json' \
+  -d '{"endDate":"2026-10-26T16:00:00.000Z"}'
+
+# 6) Second finish — expect 409 USAGE_ALREADY_FINISHED
+curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/usages/$USAGE_ID/finish" \
+  -H 'Content-Type: application/json' \
+  -d '{"endDate":"2026-10-26T17:00:00.000Z"}'
+
+# 7) After finish, the same pair can start again — expect 201
+curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/usages" \
+  -H 'Content-Type: application/json' \
+  -d "{\"automobileId\":\"$AUTO1\",\"driverId\":\"$DRV1\",\"startDate\":\"2026-10-26T17:00:00.000Z\",\"reason\":\"Reuse after finish\"}"
+
+# 8) List history — expect driver name + automobile plate/color/brand embedded
+curl -s "$BASE/usages" | node -pe 'JSON.stringify(JSON.parse(fs.readFileSync(0,"utf8")), null, 2)'
+```
+
+Expected outcomes summary:
+
+| Step | Expected |
+|---|---|
+| 2 Start AUTO1+DRV1 | `201`, `endDate: null` |
+| 3 AUTO1 + DRV2 | `409` `AUTOMOBILE_IN_USE` |
+| 4 AUTO2 + DRV1 | `409` `DRIVER_IN_USE` |
+| 5 Finish | `200` with `endDate` |
+| 6 Finish again | `409` `USAGE_ALREADY_FINISHED` |
+| 7 Start again | `201` |
+| 8 List | Items include `driver.name` and `automobile.plate` |
+
+You can run the same flow in Swagger UI at `/docs` (create resources, then try the conflicting `POST /usages` calls).
 
 ## Scripts
 
