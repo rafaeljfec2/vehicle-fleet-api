@@ -7,11 +7,57 @@ REST API for managing automobiles, drivers, and automobile usages. Built with No
 - Node.js 20 or newer
 - npm 10 or newer
 
-## Install
+## Quick start (run the API)
 
 ```bash
+git clone https://github.com/rafaeljfec2/vehicle-fleet-api.git
+cd vehicle-fleet-api
 npm install
+cp .env.example .env
+npm run dev
 ```
+
+The API listens on `http://localhost:3000` by default (`PORT` in `.env` or the shell).
+
+Verify:
+
+```bash
+curl -s http://localhost:3000/health
+# {"status":"ok"}
+```
+
+Interactive docs (Swagger UI): [http://localhost:3000/docs](http://localhost:3000/docs)  
+OpenAPI JSON: [http://localhost:3000/docs.json](http://localhost:3000/docs.json)
+
+### Production-like run (compiled)
+
+```bash
+npm run build
+npm start
+```
+
+`npm start` requires a previous `npm run build` (output in `dist/`).
+
+## How to test
+
+Automated suite (does **not** need the server running — Vitest boots the app in-process):
+
+```bash
+npm test
+```
+
+Optional quality checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Manual exploration with the server up (`npm run dev`):
+
+1. Open Swagger UI at `/docs` and use **Try it out**, or
+2. Use the `curl` examples below (create automobile → create driver → start usage → finish usage).
 
 ## Scripts
 
@@ -19,25 +65,12 @@ npm install
 |---|---|
 | `npm run dev` | Start API with hot reload (`tsx watch`) |
 | `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run compiled server (`node dist/server.js`) |
+| `npm start` | Run compiled server (`node dist/server.js`) — run `build` first |
 | `npm test` | Run Vitest suite once |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Type-check without emitting |
 
-Default port: `3000`. Configuration is read from the process environment. On startup the server also loads an optional local `.env` file (see `.env.example`) for keys that are not already set in the shell.
-
-```bash
-cp .env.example .env
-npm run dev
-# or
-PORT=3000 npm start
-```
-
-
-Health check: `GET http://localhost:3000/health`
-
-Interactive docs (Swagger UI): `http://localhost:3000/docs`  
-OpenAPI JSON: `http://localhost:3000/docs.json`
+Configuration is read from the process environment. On startup the server also loads an optional local `.env` file (see `.env.example`) for keys that are not already set in the shell. Existing shell variables take precedence over `.env`.
 
 ## In-memory persistence
 
@@ -51,6 +84,7 @@ src/
   composition/container.ts
   modules/automobiles|drivers|usages/
   shared/errors|http|concurrency|logging
+  docs/          OpenAPI + Swagger mount
 docs/
   SPEC.md API.md TEST-PLAN.md ARCHITECTURE.md
 tests/unit tests/integration
@@ -81,6 +115,8 @@ Full contract: [docs/API.md](docs/API.md). Acceptance criteria: [docs/SPEC.md](d
 
 ## Request examples
 
+Replace the ids returned by create calls before starting or finishing a usage.
+
 ### Create automobile
 
 ```bash
@@ -88,6 +124,8 @@ curl -s -X POST http://localhost:3000/automobiles \
   -H 'Content-Type: application/json' \
   -d '{"plate":"ABC1D23","color":"Silver","brand":"Toyota"}'
 ```
+
+Example response:
 
 ```json
 {
@@ -112,8 +150,8 @@ curl -s -X POST http://localhost:3000/drivers \
 curl -s -X POST http://localhost:3000/usages \
   -H 'Content-Type: application/json' \
   -d '{
-    "automobileId":"550e8400-e29b-41d4-a716-446655440000",
-    "driverId":"660e8400-e29b-41d4-a716-446655440001",
+    "automobileId":"<automobile-id>",
+    "driverId":"<driver-id>",
     "startDate":"2026-10-26T14:00:00.000Z",
     "reason":"Client visit"
   }'
@@ -171,12 +209,3 @@ Malformed JSON (`400`): `MALFORMED_JSON`
 - OpenAPI 3 document is served at `/docs` (Swagger UI) and `/docs.json`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Publish checklist (manual)
-
-This repository is not published automatically. Suggested steps:
-
-1. Review `docs/` and this README.
-2. Run `npm install && npm run lint && npm test && npm run build`.
-3. Confirm `.gitignore` excludes `node_modules/`, `dist/`, `coverage/`, and `.env`.
-4. Create the first commit and push to your public Git remote.
