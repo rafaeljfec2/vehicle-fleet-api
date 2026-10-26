@@ -11,6 +11,7 @@
 | Tests | Vitest + Supertest | Fast unit/HTTP tests without extra runners |
 | Concurrency | Single process `AsyncMutex` | Prevents interleaved start/finish/delete in one process |
 | Business logs | Structured JSON on stderr via `logBusinessRule` | Audits occupancy/integrity decisions without a metrics stack |
+| API docs | OpenAPI 3 + `swagger-ui-express` at `/docs` | Interactive contract aligned with the HTTP API |
 
 ## Layering
 

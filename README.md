@@ -36,6 +36,9 @@ PORT=3000 npm start
 
 Health check: `GET http://localhost:3000/health`
 
+Interactive docs (Swagger UI): `http://localhost:3000/docs`  
+OpenAPI JSON: `http://localhost:3000/docs.json`
+
 ## In-memory persistence
 
 Data lives in process memory (`Map` stores). Restarting the process clears all data. Concurrent integrity for start/finish/delete is guaranteed **only inside a single Node.js process** via an async mutex. Multiple instances do not share state or locks.
@@ -165,6 +168,7 @@ Malformed JSON (`400`): `MALFORMED_JSON`
 - Deleting an automobile or driver referenced by any usage returns `409`.
 - Process-local `AsyncMutex` serializes start, finish, and deletes that touch usage integrity.
 - Business-rule outcomes are logged as JSON lines on stderr (`rule: true`), for example `usage.started`, `usage.rejected.automobile_in_use`, `usage.finished`, `automobile.rejected.duplicate_plate`.
+- OpenAPI 3 document is served at `/docs` (Swagger UI) and `/docs.json`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

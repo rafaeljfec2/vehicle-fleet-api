@@ -3,6 +3,7 @@ import {
   createContainer,
   type AppContainer,
 } from './composition/container.js';
+import { mountSwagger } from './docs/swagger.js';
 import { createAutomobileRoutes } from './modules/automobiles/automobile.routes.js';
 import { createDriverRoutes } from './modules/drivers/driver.routes.js';
 import { createUsageRoutes } from './modules/usages/usage.routes.js';
@@ -25,6 +26,8 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
+
+  mountSwagger(app);
 
   app.use('/automobiles', createAutomobileRoutes(container.automobileController));
   app.use('/drivers', createDriverRoutes(container.driverController));
