@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AsyncMutex } from '../../src/shared/concurrency/async-mutex.js';
 import type { AppError } from '../../src/shared/errors/app-error.js';
 import { createInMemoryAutomobileRepository } from '../../src/modules/automobiles/automobile.repository.js';
 import { createInMemoryDriverRepository } from '../../src/modules/drivers/driver.repository.js';
@@ -10,8 +9,7 @@ function setup() {
   const automobiles = createInMemoryAutomobileRepository();
   const drivers = createInMemoryDriverRepository();
   const usages = createInMemoryUsageRepository();
-  const mutex = new AsyncMutex();
-  const service = createUsageService(usages, automobiles, drivers, mutex);
+  const service = createUsageService(usages, automobiles, drivers);
 
   const automobile = automobiles.create({
     id: '11111111-1111-4111-8111-111111111111',
@@ -44,9 +42,9 @@ function setup() {
 }
 
 describe('UsageService', () => {
-  it('starts a valid usage as active', async () => {
+  it('starts a valid usage as active', () => {
     const { service, automobile, driver } = setup();
-    const usage = await service.start({
+    const usage = service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
@@ -56,81 +54,87 @@ describe('UsageService', () => {
     expect(usage.reason).toBe('Client visit');
   });
 
-  it('blocks an automobile that already has an active usage', async () => {
+  it('blocks an automobile that already has an active usage', () => {
     const { service, automobile, driver, otherDriver } = setup();
-    await service.start({
+    service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'First',
     });
-    await expect(
+    expect(() =>
       service.start({
         automobileId: automobile.id,
         driverId: otherDriver.id,
         startDate: '2026-10-26T11:00:00.000Z',
         reason: 'Second',
       }),
-    ).rejects.toMatchObject({ code: 'AUTOMOBILE_IN_USE' } satisfies Partial<AppError>);
+    ).toThrowError(
+      expect.objectContaining({ code: 'AUTOMOBILE_IN_USE' } satisfies Partial<AppError>),
+    );
   });
 
-  it('blocks a driver that already has an active usage', async () => {
+  it('blocks a driver that already has an active usage', () => {
     const { service, automobile, otherAutomobile, driver } = setup();
-    await service.start({
+    service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'First',
     });
-    await expect(
+    expect(() =>
       service.start({
         automobileId: otherAutomobile.id,
         driverId: driver.id,
         startDate: '2026-10-26T11:00:00.000Z',
         reason: 'Second',
       }),
-    ).rejects.toMatchObject({ code: 'DRIVER_IN_USE' } satisfies Partial<AppError>);
+    ).toThrowError(
+      expect.objectContaining({ code: 'DRIVER_IN_USE' } satisfies Partial<AppError>),
+    );
   });
 
-  it('reports automobile conflict before driver conflict', async () => {
+  it('reports automobile conflict before driver conflict', () => {
     const { service, automobile, otherAutomobile, driver, otherDriver } =
       setup();
-    await service.start({
+    service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'Trip A',
     });
-    await service.start({
+    service.start({
       automobileId: otherAutomobile.id,
       driverId: otherDriver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'Trip B',
     });
-    await expect(
+    expect(() =>
       service.start({
         automobileId: automobile.id,
         driverId: otherDriver.id,
         startDate: '2026-10-26T11:00:00.000Z',
         reason: 'Both busy',
       }),
-    ).rejects.toMatchObject({ code: 'AUTOMOBILE_IN_USE' } satisfies Partial<AppError>);
+    ).toThrowError(
+      expect.objectContaining({ code: 'AUTOMOBILE_IN_USE' } satisfies Partial<AppError>),
+    );
   });
 
-  it('finishes an active usage and allows reuse', async () => {
+  it('finishes an active usage and allows reuse', () => {
     const { service, automobile, driver } = setup();
-    const started = await service.start({
+    const started = service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'Trip',
     });
-    const finished = await service.finish(started.id, {
+    const finished = service.finish(started.id, {
       endDate: '2026-10-26T12:00:00.000Z',
     });
     expect(finished.endDate).toBe('2026-10-26T12:00:00.000Z');
 
-    const reused = await service.start({
+    const reused = service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T13:00:00.000Z',
@@ -139,46 +143,52 @@ describe('UsageService', () => {
     expect(reused.endDate).toBeNull();
   });
 
-  it('rejects a second finish', async () => {
+  it('rejects a second finish', () => {
     const { service, automobile, driver } = setup();
-    const started = await service.start({
+    const started = service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'Trip',
     });
-    await service.finish(started.id, { endDate: '2026-10-26T12:00:00.000Z' });
-    await expect(
+    service.finish(started.id, { endDate: '2026-10-26T12:00:00.000Z' });
+    expect(() =>
       service.finish(started.id, { endDate: '2026-10-26T13:00:00.000Z' }),
-    ).rejects.toMatchObject({
-      code: 'USAGE_ALREADY_FINISHED',
-    } satisfies Partial<AppError>);
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'USAGE_ALREADY_FINISHED',
+      } satisfies Partial<AppError>),
+    );
   });
 
-  it('rejects missing automobile or driver', async () => {
+  it('rejects missing automobile or driver', () => {
     const { service, automobile, driver } = setup();
-    await expect(
+    expect(() =>
       service.start({
         automobileId: '550e8400-e29b-41d4-a716-446655440000',
         driverId: driver.id,
         startDate: '2026-10-26T10:00:00.000Z',
         reason: 'Missing auto',
       }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' } satisfies Partial<AppError>);
+    ).toThrowError(
+      expect.objectContaining({ code: 'NOT_FOUND' } satisfies Partial<AppError>),
+    );
 
-    await expect(
+    expect(() =>
       service.start({
         automobileId: automobile.id,
         driverId: '550e8400-e29b-41d4-a716-446655440001',
         startDate: '2026-10-26T10:00:00.000Z',
         reason: 'Missing driver',
       }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' } satisfies Partial<AppError>);
+    ).toThrowError(
+      expect.objectContaining({ code: 'NOT_FOUND' } satisfies Partial<AppError>),
+    );
   });
 
-  it('lists usages with related driver name and automobile data', async () => {
+  it('lists usages with related driver name and automobile data', () => {
     const { service, automobile, driver } = setup();
-    await service.start({
+    service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
@@ -190,29 +200,23 @@ describe('UsageService', () => {
     expect(listed[0]?.automobile.plate).toBe('ABC1D23');
   });
 
-  it('allows only one concurrent start for the same automobile', async () => {
+  it('rejects a second sync start for the same automobile', () => {
     const { service, automobile, driver, otherDriver } = setup();
-    const results = await Promise.allSettled([
-      service.start({
-        automobileId: automobile.id,
-        driverId: driver.id,
-        startDate: '2026-10-26T10:00:00.000Z',
-        reason: 'A',
-      }),
+    service.start({
+      automobileId: automobile.id,
+      driverId: driver.id,
+      startDate: '2026-10-26T10:00:00.000Z',
+      reason: 'A',
+    });
+    expect(() =>
       service.start({
         automobileId: automobile.id,
         driverId: otherDriver.id,
         startDate: '2026-10-26T10:00:00.000Z',
         reason: 'B',
       }),
-    ]);
-    const fulfilled = results.filter((item) => item.status === 'fulfilled');
-    const rejected = results.filter((item) => item.status === 'rejected');
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0]).toMatchObject({
-      status: 'rejected',
-      reason: expect.objectContaining({ code: 'AUTOMOBILE_IN_USE' }),
-    });
+    ).toThrowError(
+      expect.objectContaining({ code: 'AUTOMOBILE_IN_USE' } satisfies Partial<AppError>),
+    );
   });
 });

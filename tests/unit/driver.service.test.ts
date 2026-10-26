@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AsyncMutex } from '../../src/shared/concurrency/async-mutex.js';
 import type { AppError } from '../../src/shared/errors/app-error.js';
 import { createInMemoryAutomobileRepository } from '../../src/modules/automobiles/automobile.repository.js';
 import { createInMemoryDriverRepository } from '../../src/modules/drivers/driver.repository.js';
@@ -11,17 +10,16 @@ function createServices() {
   const automobiles = createInMemoryAutomobileRepository();
   const drivers = createInMemoryDriverRepository();
   const usages = createInMemoryUsageRepository();
-  const mutex = new AsyncMutex();
   return {
     automobiles,
     drivers,
-    driverService: createDriverService(drivers, usages, mutex),
-    usageService: createUsageService(usages, automobiles, drivers, mutex),
+    driverService: createDriverService(drivers, usages),
+    usageService: createUsageService(usages, automobiles, drivers),
   };
 }
 
 describe('DriverService', () => {
-  it('creates, filters by name, updates and deletes', async () => {
+  it('creates, filters by name, updates and deletes', () => {
     const { driverService } = createServices();
     const created = driverService.create({ name: ' Ana Silva ' });
     expect(created.name).toBe('Ana Silva');
@@ -32,13 +30,13 @@ describe('DriverService', () => {
     const updated = driverService.update(created.id, { name: 'Ana Souza' });
     expect(updated.name).toBe('Ana Souza');
 
-    await driverService.delete(created.id);
+    driverService.delete(created.id);
     expect(() => driverService.getById(created.id)).toThrowError(
       expect.objectContaining({ code: 'NOT_FOUND' }),
     );
   });
 
-  it('rejects delete when the driver has usages', async () => {
+  it('rejects delete when the driver has usages', () => {
     const { automobiles, driverService, usageService } = createServices();
     const driver = driverService.create({ name: 'Ana' });
     const automobile = automobiles.create({
@@ -47,15 +45,17 @@ describe('DriverService', () => {
       color: 'Silver',
       brand: 'Toyota',
     });
-    await usageService.start({
+    usageService.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'Visit',
     });
 
-    await expect(driverService.delete(driver.id)).rejects.toMatchObject({
-      code: 'DRIVER_HAS_USAGES',
-    } satisfies Partial<AppError>);
+    expect(() => driverService.delete(driver.id)).toThrowError(
+      expect.objectContaining({
+        code: 'DRIVER_HAS_USAGES',
+      } satisfies Partial<AppError>),
+    );
   });
 });

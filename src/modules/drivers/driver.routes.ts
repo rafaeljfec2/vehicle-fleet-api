@@ -49,7 +49,7 @@ export function createDriverRoutes(controller: DriverController): Router {
     '/:id',
     validate('params', uuidParamSchema),
     asyncHandler(async (req, res) => {
-      await controller.delete(req, res);
+      controller.delete(req, res);
     }),
   );
 

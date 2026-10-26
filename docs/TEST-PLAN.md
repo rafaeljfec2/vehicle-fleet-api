@@ -2,7 +2,7 @@
 
 ## Strategy
 
-- **Unit tests** (required by the assessment): services for automobiles, drivers, and usages (including concurrent occupancy), mutex, env loading, and error helpers.
+- **Unit tests** (required by the assessment): services for automobiles, drivers, and usages (including occupancy conflicts), env loading, and error helpers.
 - **Integration (HTTP) tests**: Supertest against `createApp()` with fresh in-memory repositories per test.
 - Test descriptions in English.
 - Do not claim pass/fail without command output evidence.
@@ -67,4 +67,4 @@
 
 ## Concurrency note
 
-T-U9 fires two simultaneous `POST /usages` against the same process. The process-local mutex must ensure check-and-insert atomicity. Multi-instance safety is out of scope.
+T-U9 fires two simultaneous `POST /usages` against the same process. Synchronous check-and-set on the event loop must ensure exactly one succeeds. Multi-instance safety is out of scope.

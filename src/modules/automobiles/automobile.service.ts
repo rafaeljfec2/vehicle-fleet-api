@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { AsyncMutex } from '../../shared/concurrency/async-mutex.js';
 import { conflict, notFound } from '../../shared/errors/app-error.js';
 import { logBusinessRule } from '../../shared/logging/business-log.js';
 import type { UsageRepository } from '../usages/usage.repository.js';
@@ -16,7 +15,7 @@ export type AutomobileService = Readonly<{
   getById(id: string): Automobile;
   list(filters?: AutomobileFilters): Automobile[];
   update(id: string, input: UpdateAutomobileInput): Automobile;
-  delete(id: string): Promise<void>;
+  delete(id: string): void;
 }>;
 
 function normalizePlate(plate: string): string {
@@ -96,17 +95,12 @@ function deleteAutomobile(
 export function createAutomobileService(
   repository: AutomobileRepository,
   usageRepository: UsageRepository,
-  mutex: AsyncMutex,
 ): AutomobileService {
   return {
     create: (input) => createAutomobile(repository, input),
     getById: (id) => getAutomobile(repository, id),
     list: (filters) => repository.list(filters),
     update: (id, input) => updateAutomobile(repository, id, input),
-    delete: async (id) => {
-      await mutex.runExclusive(() =>
-        deleteAutomobile(repository, usageRepository, id),
-      );
-    },
+    delete: (id) => deleteAutomobile(repository, usageRepository, id),
   };
 }

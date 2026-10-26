@@ -159,7 +159,7 @@ Configuration is read from the process environment. On startup the server also l
 
 ## In-memory persistence
 
-Data lives in process memory (`Map` stores). Restarting the process clears all data. Concurrent integrity for start/finish/delete is guaranteed **only inside a single Node.js process** via an async mutex. Multiple instances do not share state or locks.
+Data lives in process memory (`Map` stores). Restarting the process clears all data. Occupancy check-and-set (start/finish/delete integrity) is fully synchronous — no `await` between check and write — so it is reliable **inside a single Node.js process**. Multiple instances do not share state or locks.
 
 ## Module layout
 
@@ -168,7 +168,7 @@ src/
   app.ts / server.ts
   composition/container.ts
   modules/automobiles|drivers|usages/
-  shared/errors|http|concurrency|logging
+  shared/errors|http|logging
   docs/          OpenAPI + Swagger mount
 docs/
   SPEC.md API.md TEST-PLAN.md ARCHITECTURE.md
@@ -289,7 +289,7 @@ Malformed JSON (`400`): `MALFORMED_JSON`
 - Active usage = `endDate === null`.
 - Plate uniqueness after trim + uppercase.
 - Deleting an automobile or driver referenced by any usage returns `409`.
-- Process-local `AsyncMutex` serializes start, finish, and deletes that touch usage integrity.
+- Process-local integrity uses synchronous check-and-set on the Node.js event loop (no mutex library).
 - Business-rule outcomes are logged as JSON lines on stderr (`rule: true`), for example `usage.started`, `usage.rejected.automobile_in_use`, `usage.finished`, `automobile.rejected.duplicate_plate`.
 - OpenAPI 3 document is served at `/docs` (Swagger UI) and `/docs.json`.
 

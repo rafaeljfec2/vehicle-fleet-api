@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AsyncMutex } from '../../src/shared/concurrency/async-mutex.js';
 import type { AppError } from '../../src/shared/errors/app-error.js';
 import { createInMemoryAutomobileRepository } from '../../src/modules/automobiles/automobile.repository.js';
 import { createAutomobileService } from '../../src/modules/automobiles/automobile.service.js';
@@ -11,18 +10,17 @@ function createServices() {
   const automobiles = createInMemoryAutomobileRepository();
   const drivers = createInMemoryDriverRepository();
   const usages = createInMemoryUsageRepository();
-  const mutex = new AsyncMutex();
   return {
     automobiles,
     drivers,
     usages,
-    automobileService: createAutomobileService(automobiles, usages, mutex),
-    usageService: createUsageService(usages, automobiles, drivers, mutex),
+    automobileService: createAutomobileService(automobiles, usages),
+    usageService: createUsageService(usages, automobiles, drivers),
   };
 }
 
 describe('AutomobileService', () => {
-  it('creates, lists with filters, updates and deletes', async () => {
+  it('creates, lists with filters, updates and deletes', () => {
     const { automobileService } = createServices();
     const created = automobileService.create({
       plate: 'abc1d23',
@@ -50,13 +48,13 @@ describe('AutomobileService', () => {
     });
     expect(updated.color).toBe('Blue');
 
-    await automobileService.delete(created.id);
+    automobileService.delete(created.id);
     expect(() => automobileService.getById(created.id)).toThrowError(
       expect.objectContaining({ code: 'NOT_FOUND' }),
     );
   });
 
-  it('rejects duplicate plates and delete with usage history', async () => {
+  it('rejects duplicate plates and delete with usage history', () => {
     const { automobileService, drivers, usageService } = createServices();
     const automobile = automobileService.create({
       plate: 'ABC1D23',
@@ -77,15 +75,17 @@ describe('AutomobileService', () => {
       id: '33333333-3333-4333-8333-333333333333',
       name: 'Ana',
     });
-    await usageService.start({
+    usageService.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'Visit',
     });
 
-    await expect(automobileService.delete(automobile.id)).rejects.toMatchObject({
-      code: 'AUTOMOBILE_HAS_USAGES',
-    } satisfies Partial<AppError>);
+    expect(() => automobileService.delete(automobile.id)).toThrowError(
+      expect.objectContaining({
+        code: 'AUTOMOBILE_HAS_USAGES',
+      } satisfies Partial<AppError>),
+    );
   });
 });

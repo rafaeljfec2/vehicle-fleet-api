@@ -1,4 +1,3 @@
-import { AsyncMutex } from '../shared/concurrency/async-mutex.js';
 import {
   createAutomobileController,
   type AutomobileController,
@@ -37,7 +36,6 @@ import {
 } from '../modules/usages/usage.service.js';
 
 export type AppContainer = Readonly<{
-  mutex: AsyncMutex;
   automobileRepository: AutomobileRepository;
   driverRepository: DriverRepository;
   usageRepository: UsageRepository;
@@ -50,7 +48,6 @@ export type AppContainer = Readonly<{
 }>;
 
 export function createContainer(): AppContainer {
-  const mutex = new AsyncMutex();
   const automobileRepository = createInMemoryAutomobileRepository();
   const driverRepository = createInMemoryDriverRepository();
   const usageRepository = createInMemoryUsageRepository();
@@ -58,22 +55,15 @@ export function createContainer(): AppContainer {
   const automobileService = createAutomobileService(
     automobileRepository,
     usageRepository,
-    mutex,
   );
-  const driverService = createDriverService(
-    driverRepository,
-    usageRepository,
-    mutex,
-  );
+  const driverService = createDriverService(driverRepository, usageRepository);
   const usageService = createUsageService(
     usageRepository,
     automobileRepository,
     driverRepository,
-    mutex,
   );
 
   return {
-    mutex,
     automobileRepository,
     driverRepository,
     usageRepository,

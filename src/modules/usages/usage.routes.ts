@@ -12,7 +12,7 @@ export function createUsageRoutes(controller: UsageController): Router {
     '/',
     validate('body', createUsageSchema),
     asyncHandler(async (req, res) => {
-      await controller.start(req, res);
+      controller.start(req, res);
     }),
   );
 
@@ -28,7 +28,7 @@ export function createUsageRoutes(controller: UsageController): Router {
     validate('params', uuidParamSchema),
     validate('body', finishUsageSchema),
     asyncHandler(async (req, res) => {
-      await controller.finish(req, res);
+      controller.finish(req, res);
     }),
   );
 

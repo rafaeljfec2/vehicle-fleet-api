@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AsyncMutex } from '../../src/shared/concurrency/async-mutex.js';
 import { createInMemoryAutomobileRepository } from '../../src/modules/automobiles/automobile.repository.js';
 import { createInMemoryDriverRepository } from '../../src/modules/drivers/driver.repository.js';
 import { createInMemoryUsageRepository } from '../../src/modules/usages/usage.repository.js';
@@ -11,19 +10,14 @@ afterEach(() => {
 });
 
 describe('business rule logs', () => {
-  it('emits structured warn when automobile is already in use', async () => {
+  it('emits structured warn when automobile is already in use', () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
 
     const automobiles = createInMemoryAutomobileRepository();
     const drivers = createInMemoryDriverRepository();
     const usages = createInMemoryUsageRepository();
-    const service = createUsageService(
-      usages,
-      automobiles,
-      drivers,
-      new AsyncMutex(),
-    );
+    const service = createUsageService(usages, automobiles, drivers);
 
     const automobile = automobiles.create({
       id: '11111111-1111-4111-8111-111111111111',
@@ -40,21 +34,21 @@ describe('business rule logs', () => {
       name: 'Bruno',
     });
 
-    await service.start({
+    service.start({
       automobileId: automobile.id,
       driverId: driver.id,
       startDate: '2026-10-26T10:00:00.000Z',
       reason: 'First',
     });
 
-    await expect(
+    expect(() =>
       service.start({
         automobileId: automobile.id,
         driverId: otherDriver.id,
         startDate: '2026-10-26T11:00:00.000Z',
         reason: 'Second',
       }),
-    ).rejects.toMatchObject({ code: 'AUTOMOBILE_IN_USE' });
+    ).toThrowError(expect.objectContaining({ code: 'AUTOMOBILE_IN_USE' }));
 
     expect(infoSpy).toHaveBeenCalledWith(
       'usage.started',

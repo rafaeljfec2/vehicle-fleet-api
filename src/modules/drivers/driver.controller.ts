@@ -11,7 +11,7 @@ export type DriverController = Readonly<{
   getById(req: Request, res: Response): void;
   list(req: Request, res: Response): void;
   update(req: Request, res: Response): void;
-  delete(req: Request, res: Response): Promise<void>;
+  delete(req: Request, res: Response): void;
 }>;
 
 function readDriverFilters(req: Request): DriverFilters {
@@ -43,8 +43,8 @@ export function createDriverController(
       res.status(200).json(service.update(readParamId(req), req.body));
     },
 
-    async delete(req, res) {
-      await service.delete(readParamId(req));
+    delete(req, res) {
+      service.delete(readParamId(req));
       res.status(204).send();
     },
   };

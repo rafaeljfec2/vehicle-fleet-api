@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { AsyncMutex } from '../../shared/concurrency/async-mutex.js';
 import {
   conflict,
   notFound,
@@ -17,8 +16,8 @@ import type {
 } from './usage.types.js';
 
 export type UsageService = Readonly<{
-  start(input: CreateUsageInput): Promise<Usage>;
-  finish(id: string, input: FinishUsageInput): Promise<Usage>;
+  start(input: CreateUsageInput): Usage;
+  finish(id: string, input: FinishUsageInput): Usage;
   list(): UsageWithRelations[];
 }>;
 
@@ -64,6 +63,11 @@ function assertCanStart(deps: UsageDeps, input: CreateUsageInput): void {
   }
 }
 
+/**
+ * Occupancy check-and-set must stay fully synchronous (no await between
+ * assertCanStart and create) so the Node.js event loop cannot interleave
+ * another request in this process.
+ */
 function startUsage(deps: UsageDeps, input: CreateUsageInput): Usage {
   if (deps.automobiles.findById(input.automobileId) === undefined) {
     throw notFound('Automobile not found');
@@ -143,7 +147,6 @@ export function createUsageService(
   usageRepository: UsageRepository,
   automobileRepository: AutomobileRepository,
   driverRepository: DriverRepository,
-  mutex: AsyncMutex,
 ): UsageService {
   const deps: UsageDeps = {
     usages: usageRepository,
@@ -152,10 +155,8 @@ export function createUsageService(
   };
 
   return {
-    start: async (input) =>
-      mutex.runExclusive(() => startUsage(deps, input)),
-    finish: async (id, input) =>
-      mutex.runExclusive(() => finishUsage(deps, id, input)),
+    start: (input) => startUsage(deps, input),
+    finish: (id, input) => finishUsage(deps, id, input),
     list: () =>
       deps.usages.list().map((usage) => toUsageWithRelations(deps, usage)),
   };

@@ -52,7 +52,7 @@ function mountItemRoutes(
     '/:id',
     validate('params', uuidParamSchema),
     asyncHandler(async (req, res) => {
-      await controller.delete(req, res);
+      controller.delete(req, res);
     }),
   );
 }

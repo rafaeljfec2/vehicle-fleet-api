@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { AsyncMutex } from '../../shared/concurrency/async-mutex.js';
 import { conflict, notFound } from '../../shared/errors/app-error.js';
 import { logBusinessRule } from '../../shared/logging/business-log.js';
 import type { UsageRepository } from '../usages/usage.repository.js';
@@ -16,7 +15,7 @@ export type DriverService = Readonly<{
   getById(id: string): Driver;
   list(filters?: DriverFilters): Driver[];
   update(id: string, input: UpdateDriverInput): Driver;
-  delete(id: string): Promise<void>;
+  delete(id: string): void;
 }>;
 
 function getDriver(repository: DriverRepository, id: string): Driver {
@@ -58,7 +57,6 @@ function deleteDriver(
 export function createDriverService(
   repository: DriverRepository,
   usageRepository: UsageRepository,
-  mutex: AsyncMutex,
 ): DriverService {
   return {
     create: (input) =>
@@ -67,10 +65,6 @@ export function createDriverService(
     list: (filters) => repository.list(filters),
     update: (id, input) =>
       updateDriver(repository, id, { name: input.name.trim() }),
-    delete: async (id) => {
-      await mutex.runExclusive(() =>
-        deleteDriver(repository, usageRepository, id),
-      );
-    },
+    delete: (id) => deleteDriver(repository, usageRepository, id),
   };
 }
